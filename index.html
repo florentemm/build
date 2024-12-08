@@ -222,8 +222,7 @@
   </div>
   
 <script>
-  // Преобразование Base64 в ArrayBuffer
-  function base64ToArrayBuffer(base64) {
+  function base64ToArrayBuffer (base64) {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -232,69 +231,46 @@
     return bytes.buffer;
   }
 
-  // Расшифровка строки
-  async function decryptString({ ciphertext, iv }, secret) {
-    const ivArr = iv ? base64ToArrayBuffer(iv) : new Uint8Array(1);
-    const aesKey = await window.crypto.subtle.importKey(
-      'raw', 
-      base64ToArrayBuffer(secret), 
-      { name: 'AES-GCM', length: 256 }, 
-      false, 
-      ['decrypt']
-    );
+  async function decryptString ({ ciphertext, iv }, secret) {
+    const ivArr = iv ? base64ToArrayBuffer(iv) : new Uint8Array(1)
+    const aesKey = await window.crypto.subtle.importKey('raw', base64ToArrayBuffer(secret), {
+      name: 'AES-GCM',
+      length: 256
+    }, false, ['decrypt'])
 
-    const plaintext = [];
+    const plaintext = []
     for (let index = 0; index < ciphertext.length; index++) {
-      const ciphertextChunk = ciphertext[index];
-      if (!iv) ivArr[0] = index & 0xFF;
-      const ciphertextBuf = base64ToArrayBuffer(ciphertextChunk);
+      const ciphertextChunk = ciphertext[index]
+      if (!iv) ivArr[0] = index & 0xFF
+      const ciphertextBuf = base64ToArrayBuffer(ciphertextChunk)
       const plaintextChunk = await window.crypto.subtle
-        .decrypt({ name: 'AES-GCM', iv: ivArr }, aesKey, ciphertextBuf);
-      plaintext.push(new TextDecoder().decode(plaintextChunk));
+        .decrypt({ name: 'AES-GCM', iv: ivArr }, aesKey, ciphertextBuf)
+      plaintext.push(new TextDecoder().decode(plaintextChunk))
     }
-    return plaintext.join('');
+    return plaintext.join('')
   }
 
-  // Функция сортировки списка
-  function sortList() {
-    const $list = document.querySelector(".has-list-bullet");
-    if ($list) {
-      const items = Array.from($list.children);
-      items.sort((a, b) => {
-        const aSort = parseInt(a.getAttribute('data-sort'), 10) || 0;
-        const bSort = parseInt(b.getAttribute('data-sort'), 10) || 0;
-        return bSort - aSort; // Сортировка по убыванию
+  /*
+   * Decrypt the original note content
+   */
+  const encryptedData = document.getElementById('encrypted-data').innerText.trim();
+  const payload = encryptedData ? JSON.parse(encryptedData) : '';
+  const secret = window.location.hash.slice(1); // Taken from the URL # parameter
+  if (payload && secret) {
+    decryptString({ ciphertext: payload.ciphertext, iv: payload.iv }, secret)
+      .then(text => {
+        // Inject the user's data
+        const data = JSON.parse(text);
+        const contentEl = document.getElementById('template-user-data');
+        if (contentEl) contentEl.outerHTML = data.content;
+        document.title = data.basename;
+        initDocument();
+      })
+      .catch(() => {
+        const contentEl = document.getElementById('template-user-data');
+        if (contentEl) contentEl.innerHTML = 'Unable to decrypt using this key.';
       });
-      items.forEach(item => $list.appendChild(item)); // Добавляем отсортированные элементы обратно
-    }
   }
-
-  // Основная логика
-  document.addEventListener('DOMContentLoaded', () => {
-    const encryptedData = document.getElementById('encrypted-data')?.innerText.trim();
-    const payload = encryptedData ? JSON.parse(encryptedData) : '';
-    const secret = window.location.hash.slice(1); // Ключ из хэша URL
-
-    if (payload && secret) {
-      decryptString({ ciphertext: payload.ciphertext, iv: payload.iv }, secret)
-        .then(text => {
-          const data = JSON.parse(text);
-          const contentEl = document.getElementById('template-user-data');
-          if (contentEl) contentEl.outerHTML = data.content;
-          document.title = data.basename;
-
-          // Инициализация документа и сортировка списка
-          initDocument();
-          sortList();
-        })
-        .catch(() => {
-          const contentEl = document.getElementById('template-user-data');
-          if (contentEl) contentEl.innerHTML = 'Невозможно расшифровать данные с этим ключом.';
-        });
-    } else {
-      sortList(); // Если данных нет, сортировка по умолчанию
-    }
-  });
 </script>
 
 </body></html>
